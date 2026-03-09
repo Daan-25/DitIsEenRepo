@@ -63,7 +63,7 @@ int main() {
         const std::string body =
             "<!doctype html>"
             "<html><head><meta charset='utf-8'><title>Hello</title></head>"
-            "<body><h1>Hello World from C++ on Azure VM!</h1></body></html>";
+            "<body><h1>Hello World from C++ on Azure VM! CMAKE!!!</h1></body></html>";
 
         const std::string response =
             "HTTP/1.1 200 OK\r\n"
