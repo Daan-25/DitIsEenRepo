@@ -1,4 +1,4 @@
-name: Build and deploy C++ app to Azure Web App
+name: Deploy C++ to Azure VM
 
 on:
   push:
@@ -6,33 +6,32 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: hellocppacr.azurecr.io
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-
-      - name: Build image
+      - name: Setup SSH
         run: |
-          docker build -t hellocppacr.azurecr.io/cpp-hello:${{ github.sha }} .
-          docker tag hellocppacr.azurecr.io/cpp-hello:${{ github.sha }} hellocppacr.azurecr.io/cpp-hello:latest
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Push image
+      - name: Copy source to VM
         run: |
-          docker push hellocppacr.azurecr.io/cpp-hello:${{ github.sha }}
-          docker push hellocppacr.azurecr.io/cpp-hello:latest
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "mkdir -p ~/hellocpp"
+          scp main.cpp ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/hellocpp/main.cpp
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: hellocppwebapp
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: 'hellocppacr.azurecr.io/cpp-hello:${{ github.sha }}'
+      - name: Build and restart on VM
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} '
+            set -e
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            g++ -O2 -std=c++17 -o ~/hellocpp/hello-web ~/hellocpp/main.cpp
+            sudo systemctl restart hellocpp
+            sudo systemctl status hellocpp --no-pager
+          '
