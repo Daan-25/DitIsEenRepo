@@ -1,4 +1,4 @@
-name: Deploy C++ to Azure VM
+name: Deploy C++ with CMake to Azure VM
 
 on:
   push:
@@ -20,18 +20,25 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Copy source to VM
+      - name: Copy project files to VM
         run: |
           ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "mkdir -p ~/hellocpp"
+          scp CMakeLists.txt ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/hellocpp/CMakeLists.txt
           scp main.cpp ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/hellocpp/main.cpp
 
-      - name: Build and restart on VM
+      - name: Build with CMake and restart service
         run: |
           ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} '
             set -e
             sudo apt-get update
-            sudo apt-get install -y build-essential
-            g++ -O2 -std=c++17 -o ~/hellocpp/hello-web ~/hellocpp/main.cpp
+            sudo apt-get install -y build-essential cmake
+
+            mkdir -p ~/hellocpp/build
+            cd ~/hellocpp
+
+            cmake -S . -B build
+            cmake --build build -j
+
             sudo systemctl restart hellocpp
             sudo systemctl status hellocpp --no-pager
           '
